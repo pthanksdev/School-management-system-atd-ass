@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: school_db
+    environment:
+      POSTGRES_DB: school_db
+      POSTGRES_USER: school_user
+      POSTGRES_PASSWORD: school_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U school_user -d school_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Spring Boot App ────────────────────────────────────────
+  app:
+    build: .
+    container_name: school_app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DATABASE_URL: jdbc:postgresql://postgres:5432/school_db
+      DATABASE_USERNAME: school_user
+      DATABASE_PASSWORD: school_pass
+      JWT_SECRET: ${JWT_SECRET:-change_this_to_a_very_long_secret_key_in_prod}
+      JWT_EXPIRATION: 86400000
+      JWT_REFRESH_EXPIRATION: 604800000
+      FIREBASE_CONFIG_PATH: /app/firebase-service-account.json
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
+    restart: unless-stopped
+
+volumes:
+  pgdata:
