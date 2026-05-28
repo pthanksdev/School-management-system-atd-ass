@@ -1,6 +1,9 @@
 package com.school.auth.filter;
 
 import com.school.common.util.JwtUtil;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
@@ -19,7 +22,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -29,15 +32,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
 
-    private static final List<String> PUBLIC_PATHS = Arrays.asList(
-        "/auth/login",
-        "/auth/refresh-token",
-        "/actuator/health",
-        "/v3/api-docs",
-        "/swagger-ui",
-        "/webjars"
-    );
-
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
@@ -45,56 +39,47 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        // --- The Fix: Check for public paths FIRST ---
-        String path = request.getRequestURI();
-        boolean isPublicPath = PUBLIC_PATHS.stream().anyMatch(path::startsWith);
-
-        if (isPublicPath) {
-            filterChain.doFilter(request, response); // Public path, so skip token validation
-            return;
-        }
-
-        String token = extractTokenFromRequest(request);
-
-        if (token == null) {
-            filterChain.doFilter(request, response); // No token, let Spring Security handle it
-            return;
-        }
-
-        try {
-            String username = jwtUtil.extractUsername(token);
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                if (jwtUtil.isTokenValid(token, userDetails)) {
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities());
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+        extractTokenFromRequest(request).ifPresent(token -> {
+            try {
+                String username = jwtUtil.extractUsername(token);
+                if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                    if (jwtUtil.isTokenValid(token, userDetails)) {
+                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities());
+                        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                        log.debug("User '{}' authenticated successfully.", username);
+                    }
                 }
+            } catch (ExpiredJwtException e) {
+                log.warn("JWT token has expired: {}", e.getMessage());
+            } catch (SignatureException | MalformedJwtException e) {
+                log.warn("Invalid JWT token: {}", e.getMessage());
+            } catch (Exception e) {
+                log.error("JWT authentication failed unexpectedly.", e);
             }
-        } catch (Exception e) {
-            log.error("JWT authentication failed: {}", e.getMessage());
-            // Optionally, you could clear the security context here
-            // SecurityContextHolder.clearContext();
-        }
+        });
 
         filterChain.doFilter(request, response);
     }
 
-    private String extractTokenFromRequest(HttpServletRequest request) {
-        // Try httpOnly cookie first
+    private Optional<String> extractTokenFromRequest(HttpServletRequest request) {
+        // First, try the Authorization header.
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return Optional.of(authHeader.substring(7));
+        }
+
+        // If not in header, fall back to the 'jwt' cookie.
         if (request.getCookies() != null) {
             return Arrays.stream(request.getCookies())
                     .filter(c -> "jwt".equals(c.getName()))
                     .map(Cookie::getValue)
-                    .findFirst()
-                    .orElse(null);
+                    .findFirst();
         }
-        // Fallback: Authorization header
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            return authHeader.substring(7);
-        }
-        return null;
+
+        // No token found.
+        return Optional.empty();
     }
 }
