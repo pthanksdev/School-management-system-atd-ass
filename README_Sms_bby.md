@@ -17,8 +17,8 @@ A modern web-based school management system focused on **attendance tracking** a
 |Backend         |Spring Boot (Java)                      |
 |Database        |PostgreSQL                              |
 |Auth            |Spring Security + JWT (httpOnly cookies)|
-|Notifications   |Firebase Cloud Messaging                |
-|File Storage    |AWS S3 / Cloudinary                     |
+|Notifications   |inbuilt            |
+|File Storage    | Cloudinary                     |
 
 -----
 
