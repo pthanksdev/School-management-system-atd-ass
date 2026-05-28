@@ -39,6 +39,8 @@ public class SecurityConfig {
                 .requestMatchers("/auth/login", "/auth/refresh-token").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**", "/webjars/**").permitAll()
+                // Fix for requests still going to the old /api/v1 prefix
+                .requestMatchers("/api/v1/v3/api-docs/**", "/api/v1/swagger-ui.html", "/api/v1/swagger-ui/**").permitAll()
 
                 // --- Admin-Only Endpoints ---
                 .requestMatchers("/users").hasRole(Role.ADMIN.name())
