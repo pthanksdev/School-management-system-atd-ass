@@ -19,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -28,6 +29,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
 
+    private static final List<String> PUBLIC_PATHS = Arrays.asList(
+        "/auth/login",
+        "/auth/refresh-token",
+        "/actuator/health",
+        "/v3/api-docs",
+        "/swagger-ui",
+        "/webjars"
+    );
+
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
@@ -35,10 +45,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
+        // --- The Fix: Check for public paths FIRST ---
+        String path = request.getRequestURI();
+        boolean isPublicPath = PUBLIC_PATHS.stream().anyMatch(path::startsWith);
+
+        if (isPublicPath) {
+            filterChain.doFilter(request, response); // Public path, so skip token validation
+            return;
+        }
+
         String token = extractTokenFromRequest(request);
 
         if (token == null) {
-            filterChain.doFilter(request, response);
+            filterChain.doFilter(request, response); // No token, let Spring Security handle it
             return;
         }
 
@@ -55,6 +74,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
         } catch (Exception e) {
             log.error("JWT authentication failed: {}", e.getMessage());
+            // Optionally, you could clear the security context here
+            // SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
