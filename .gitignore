@@ -1,0 +1,17 @@
+resources/applicatipn.properties
+resources/application.yml
+resources/application-dev.yml
+resources/application-prod.yml
+resources/application-test.yml
+resources/application-local.yml
+resources/application-*.yml
+
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+.env.local.example
+.env.development.example
+.env.production.example
+.env.test.example    
