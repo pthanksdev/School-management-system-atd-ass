@@ -6,16 +6,16 @@ services:
     image: postgres:16-alpine
     container_name: school_db
     environment:
-      POSTGRES_DB: school_db
-      POSTGRES_USER: school_user
-      POSTGRES_PASSWORD: school_pass
+      POSTGRES_DB: ${POSTGRES_DB:-school_db}
+      POSTGRES_USER: ${POSTGRES_USER:-school_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-school_pass}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U school_user -d school_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-school_user} -d ${POSTGRES_DB:-school_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,12 +29,12 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      DATABASE_URL: jdbc:postgresql://postgres:5432/school_db
-      DATABASE_USERNAME: school_user
-      DATABASE_PASSWORD: school_pass
-      JWT_SECRET: ${JWT_SECRET:-change_this_to_a_very_long_secret_key_in_prod}
-      JWT_EXPIRATION: 86400000
-      JWT_REFRESH_EXPIRATION: 604800000
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-school_db}
+      DATABASE_USERNAME: ${POSTGRES_USER:-school_user}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-school_pass}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
       FIREBASE_CONFIG_PATH: /app/firebase-service-account.json
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}

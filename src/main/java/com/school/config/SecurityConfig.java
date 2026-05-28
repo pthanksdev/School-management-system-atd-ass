@@ -24,33 +24,24 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
 
-    // Swagger UI / OpenAPI endpoints
-    private static final String[] SWAGGER_WHITELIST = {
-            "/swagger-ui.html",
-            "/swagger-ui/**",
-            "/v3/api-docs",
-            "/v3/api-docs/**",
-            "/swagger-resources",
-            "/swagger-resources/**",
-            "/webjars/**"
-    };
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> {})
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .sessionManagement(session -> 
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            .authenticationProvider(authenticationProvider)
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
-                // Swagger UI — public
-                .requestMatchers(SWAGGER_WHITELIST).permitAll()
-
-                // Auth endpoints — public
+                // --- Whitelist Public Endpoints ---
                 .requestMatchers("/auth/login", "/auth/refresh-token").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**", "/webjars/**").permitAll()
 
-                // Admin only
+                // --- Admin-Only Endpoints ---
+                .requestMatchers("/users").hasRole(Role.ADMIN.name())
                 .requestMatchers(HttpMethod.DELETE, "/users/**").hasRole(Role.ADMIN.name())
                 .requestMatchers(HttpMethod.POST, "/students").hasRole(Role.ADMIN.name())
                 .requestMatchers(HttpMethod.POST, "/teachers").hasRole(Role.ADMIN.name())
@@ -58,9 +49,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/departments/**").hasRole(Role.ADMIN.name())
                 .requestMatchers(HttpMethod.POST, "/subjects/**").hasRole(Role.ADMIN.name())
                 .requestMatchers(HttpMethod.POST, "/classes/**").hasRole(Role.ADMIN.name())
-                .requestMatchers("/users").hasRole(Role.ADMIN.name())
-
-                // Teacher + Admin
+                
+                // --- Teacher & Admin Endpoints ---
                 .requestMatchers("/files/**").hasAnyRole(Role.ADMIN.name(), Role.TEACHER.name())
                 .requestMatchers(HttpMethod.POST, "/attendance/mark").hasAnyRole(Role.ADMIN.name(), Role.TEACHER.name())
                 .requestMatchers(HttpMethod.PUT, "/attendance/**").hasAnyRole(Role.ADMIN.name(), Role.TEACHER.name())
@@ -69,14 +59,12 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/assignments/**").hasAnyRole(Role.ADMIN.name(), Role.TEACHER.name())
                 .requestMatchers("/submissions/*/grade").hasAnyRole(Role.ADMIN.name(), Role.TEACHER.name())
 
-                // Student
+                // --- Student-Only Endpoints ---
                 .requestMatchers(HttpMethod.POST, "/submissions").hasRole(Role.STUDENT.name())
 
-                // All authenticated users
+                // --- Catch-All: All other requests must be authenticated ---
                 .anyRequest().authenticated()
-            )
-            .authenticationProvider(authenticationProvider)
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            );
 
         return http.build();
     }
