@@ -61,6 +61,7 @@ public class SecurityConfig {
                 .requestMatchers("/users").hasRole(Role.ADMIN.name())
 
                 // Teacher + Admin
+                .requestMatchers("/files/**").hasAnyRole(Role.ADMIN.name(), Role.TEACHER.name())
                 .requestMatchers(HttpMethod.POST, "/attendance/mark").hasAnyRole(Role.ADMIN.name(), Role.TEACHER.name())
                 .requestMatchers(HttpMethod.PUT, "/attendance/**").hasAnyRole(Role.ADMIN.name(), Role.TEACHER.name())
                 .requestMatchers(HttpMethod.POST, "/assignments").hasAnyRole(Role.ADMIN.name(), Role.TEACHER.name())
